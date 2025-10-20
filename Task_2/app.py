@@ -120,14 +120,44 @@ def generate_dataset(dtype, n_samples, n_features, centers, cluster_std, random_
     return X, y
 
 # ---- Build dataset ----
-if 'submitted_dataset' not in locals():
-    submitted_dataset = True  # initial run
-if submitted_dataset:
-    if dataset_type == "make_blobs":
-        centers_param = n_centers if isinstance(n_centers, int) else None
-        X, y_true = generate_dataset("make_blobs", n_samples, n_features, centers_param, cluster_std, random_state)
+# ---- Build dataset (robust generation) ----
+# Ensure variable n_centers exists (it may only be created inside the form branch)
+try:
+    n_centers
+except NameError:
+    n_centers = None
+
+# Always generate a dataset (use current widget values) so X is always defined
+if dataset_type == "make_blobs":
+    centers_param = n_centers if isinstance(n_centers, int) else None
+    X, y_true = generate_dataset("make_blobs", n_samples, n_features, centers_param, cluster_std, random_state)
+else:
+    # make_moons only produces 2D; generator ignores n_features, centers
+    X, y_true = generate_dataset("make_moons", n_samples, 2, None, cluster_std, random_state)
+
+# ---- Scaling ----
+if scaler_name != "None":
+    if scaler_name == "StandardScaler":
+        scaler = StandardScaler()
+    elif scaler_name == "MinMaxScaler":
+        scaler = MinMaxScaler()
+    elif scaler_name == "RobustScaler":
+        scaler = RobustScaler()
     else:
-        X, y_true = generate_dataset("make_moons", n_samples, n_features, None, cluster_std, random_state)
+        scaler = None
+
+    if scaler is not None:
+        try:
+            X_scaled = scaler.fit_transform(X)
+        except Exception as e:
+            st.error(f"Error during scaling: {e}")
+            X_scaled = X.copy()
+    else:
+        X_scaled = X.copy()
+else:
+    # no scaler selected
+    X_scaled = X.copy()
+
 
 # ---- Scaling ----
 if scaler_name != "None":
